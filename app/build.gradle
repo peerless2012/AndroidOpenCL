@@ -7,9 +7,9 @@ android {
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.peerless2012.opencl"
+        applicationId "com.peerless2012.demo.opencl"
         minSdk 21
-        targetSdk 33
+        targetSdk 31
         versionCode 1
         versionName "1.0"
 

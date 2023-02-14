@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <application>
+
+        <uses-native-library
+            android:name="OpenCL"
+            android:required="true"/>
+
+    </application>
+
 </manifest>
