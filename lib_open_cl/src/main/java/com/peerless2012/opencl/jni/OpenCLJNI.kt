@@ -14,19 +14,25 @@ object OpenCLJNI {
     const val TAG = "OpenCL"
 
     init {
+        var findOpenCL = false
         try {
             // /vendor/lib64/libOpenCL.so
             System.loadLibrary("OpenCL")
             Log.i(TAG, "OpenCL load success!!!")
+            findOpenCL = true
         } catch (exception: UnsatisfiedLinkError) {
             exception.printStackTrace()
             try {
                 System.load("/vendor/lib64/libOpenCL.so")
                 Log.i(TAG, "OpenCL load success!!!")
+                findOpenCL = true
             } catch (e2: UnsatisfiedLinkError) {
                 Log.e(TAG, "OpenCL load Fail!!!")
                 e2.printStackTrace()
             }
+        }
+        if (findOpenCL) {
+            System.loadLibrary("OpenCL4J")
         }
     }
 

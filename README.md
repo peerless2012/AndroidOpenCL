@@ -2,6 +2,7 @@
 OpenCL for Android.
 
 ## 参考资料
+* [OpenCL-SDK](https://github.com/KhronosGroup/OpenCL-SDK)
 * [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers)
 * [Why did Google choose RenderScript instead of OpenCL](https://stackoverflow.com/questions/14385843/why-did-google-choose-renderscript-instead-of-opencl)
 * [Portable Computing Language](https://github.com/pocl/pocl)
