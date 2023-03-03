@@ -1,3 +1,6 @@
 [submodule "contrib/OpenCL-Headers"]
 	path = contrib/OpenCL-Headers
 	url = https://github.com/KhronosGroup/OpenCL-Headers.git
+[submodule "contrib/OpenCL-ICD-Loader"]
+	path = contrib/OpenCL-ICD-Loader
+	url = https://github.com/KhronosGroup/OpenCL-ICD-Loader.git
