@@ -1,7 +1,7 @@
 package com.peerless2012.demo.opencl
 
 import android.app.Application
-import com.peerless2012.opencl.jni.OpenCLJNI
+import com.peerless2012.demo.opencl.jni.OpenCL4J
 
 /**
  * @Author peerless2012
@@ -14,7 +14,7 @@ class App: Application() {
 
     override fun onCreate() {
         super.onCreate()
-        OpenCLJNI.load()
+        OpenCL4J.load()
     }
 
 }

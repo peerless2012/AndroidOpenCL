@@ -13,8 +13,9 @@ object OpenCLJNI {
 
     const val TAG = "OpenCL"
 
+    var findOpenCL = false
+
     init {
-        var findOpenCL = false
         try {
             // /vendor/lib64/libOpenCL.so
             System.loadLibrary("OpenCL")
@@ -31,13 +32,6 @@ object OpenCLJNI {
                 e2.printStackTrace()
             }
         }
-        if (findOpenCL) {
-            System.loadLibrary("OpenCL4J")
-        }
-    }
-
-    fun load() {
-
     }
 
 }
