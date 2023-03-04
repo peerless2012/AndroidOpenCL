@@ -1,6 +1,11 @@
 # AndroidOpenCL
 OpenCL for Android.
 
+## 构建
+1. clone this project.
+2. git submodule init update --recursive
+3. sync and run.
+
 ## 参考资料
 * [OpenCL-SDK](https://github.com/KhronosGroup/OpenCL-SDK)
 * [OpenCL-Headers](https://github.com/KhronosGroup/OpenCL-Headers)
