@@ -7,12 +7,24 @@
  */
 
 #include "OpenCL4J.h"
+#include "CL/cl_gl.h"
+#include "CL/cl_gl_ext.h"
 #include <string>
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include "GLES2/gl2.h"
 
 #define printf ALOGV
+
+static const char * source =
+         "__kernel void rgba_to_gray(__read_only image2d_t input, __write_only image2d_t output)\n"
+         "{\n"
+         "    int2 coord = (int2)(get_global_id(0), get_global_id(1));\n"
+         "    float4 pixel = read_imagef(input, CLK_NORMALIZED_COORDS_FLOAT, coord);\n"
+         "    float gray = dot(pixel.rgb, (float3)(0.299, 0.587, 0.114));\n"
+         "    write_imagef(output, coord, (float4)(gray, gray, gray, pixel.a));\n"
+         "}";
 
 void printOpenCLInfo() {
 
@@ -409,5 +421,14 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 void JNI_OnUnload(JavaVM *vm, void *reserved) {
     ALOGI("OpenCL4J JNI_OnUnload");
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nColorfulToGray(JNIEnv *env, jobject thiz,
+                                                               jint texture) {
+    // https://gist.github.com/timweri/de34d94349a206f4396cb0b8724edfe6
+//    cl_context clContext = clCreateContext();
+//    clCreateFromGLTexture(clContext, )
 }
 
