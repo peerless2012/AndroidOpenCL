@@ -3,7 +3,7 @@ OpenCL for Android.
 
 ## Build
 1. clone this project.
-2. git submodule init update --recursive
+2. git submodule update --init --recursive
 3. sync and run.
 
 ## Refer

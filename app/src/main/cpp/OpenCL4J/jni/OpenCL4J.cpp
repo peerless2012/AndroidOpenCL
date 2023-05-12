@@ -9,11 +9,16 @@
 #include "OpenCL4J.h"
 #include "CL/cl_gl.h"
 #include "CL/cl_gl_ext.h"
+#include "CL/cl_egl.h"
 #include <string>
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include "GLES2/gl2.h"
+#include "GLES2/gl2ext.h"
+#include "GLES3/gl3.h"
+#include "EGL/egl.h"
+#include "EGL/eglext.h"
 
 #define printf ALOGV
 
@@ -424,11 +429,56 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
 }
 
 extern "C"
+JNIEXPORT jint JNICALL
+Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nCreateTexture(JNIEnv *env, jobject thiz) {
+    // https://stackoverflow.com/a/57069634/3769941
+    EGLint clientBufferAttrs[] = { EGL_WIDTH, 3840,
+                                   EGL_HEIGHT, 2160,
+                                   EGL_RED_SIZE, 8,
+                                   EGL_GREEN_SIZE, 8,
+                                   EGL_BLUE_SIZE, 8,
+                                   EGL_ALPHA_SIZE, 8,
+                                   EGL_NATIVE_BUFFER_USAGE_ANDROID, EGL_NATIVE_BUFFER_USAGE_TEXTURE_BIT_ANDROID,
+                                   EGL_NONE };
+    // https://registry.khronos.org/EGL/extensions/ANDROID/EGL_ANDROID_create_native_client_buffer.txt
+    EGLClientBuffer eglClientBuffer = eglCreateNativeClientBufferANDROID(clientBufferAttrs);
+    if (eglClientBuffer == nullptr) {
+        ALOGE("eglCreateNativeClientBufferANDROID error: %d", eglGetError());
+        return 0;
+    }
+
+    EGLImageKHR eglImageKhr = eglCreateImageKHR(eglGetCurrentDisplay(),
+                                                eglGetCurrentContext(),
+                                                EGL_NATIVE_BUFFER_ANDROID,
+                                                eglClientBuffer,
+                                                0);
+    if (eglImageKhr == nullptr) {
+        ALOGE("eglCreateImageKHR error: %d", eglGetError());
+        return 0;
+    }
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    if (texture < 0) {
+        ALOGE("glGenTextures error: %d", eglGetError());
+        return 0;
+    }
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES) eglImageKhr);
+    return texture;
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nColorfulToGray(JNIEnv *env, jobject thiz,
                                                                jint texture) {
-    // https://gist.github.com/timweri/de34d94349a206f4396cb0b8724edfe6
+//     https://gist.github.com/timweri/de34d94349a206f4396cb0b8724edfe6
 //    cl_context clContext = clCreateContext();
 //    clCreateFromGLTexture(clContext, )
+//    clCreateFromEGLImageKHR()
 }
 

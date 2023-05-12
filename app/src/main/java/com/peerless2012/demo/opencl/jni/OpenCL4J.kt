@@ -23,10 +23,16 @@ object OpenCL4J {
 
     }
 
+    fun createTexture(): Int {
+        return nCreateTexture()
+    }
+
     fun colorfulToGray(texture: Int) {
         if (!OpenCLJNI.findOpenCL) return
         nColorfulToGray(texture)
     }
+
+    private external fun nCreateTexture(): Int
 
     private external fun nColorfulToGray(texture: Int)
 
