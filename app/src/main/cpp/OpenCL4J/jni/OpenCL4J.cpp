@@ -428,6 +428,46 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
     ALOGI("OpenCL4J JNI_OnUnload");
 }
 
+/**
+ * Texture2D to EGLImageKHR
+ * Make sure call this func after glFinish() the Texture2D.
+ * @param textureId
+ * @return
+ */
+static EGLImageKHR textureToEGLImageKHR(GLint textureId) {
+    //KHRImage
+    EGLint eglImageAttributes[] = {
+            EGL_GL_TEXTURE_LEVEL_KHR, 0
+            , EGL_IMAGE_PRESERVED_KHR, EGL_TRUE
+            , EGL_NONE
+    };
+    EGLClientBuffer egl_buffer = (EGLClientBuffer) (textureId);
+    EGLImageKHR eglImageKHR = eglCreateImageKHR(eglGetCurrentDisplay()
+            , eglGetCurrentContext()
+            , EGL_GL_TEXTURE_2D_KHR
+            , egl_buffer
+            , eglImageAttributes);
+    ALOGD("eglImageHandle = %x", eglImageKHR);
+    return eglImageKHR;
+}
+
+/**
+ * EGLImageKHR to Texture2D
+ * @param eglImageKhr
+ * @return
+ */
+static GLuint eglImageKHRToTexture(EGLImageKHR eglImageKhr) {
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, eglImageKhr);
+    return texture;
+}
+
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nCreateTexture(JNIEnv *env, jobject thiz) {
