@@ -27,13 +27,13 @@ object OpenCL4J {
         return nCreateTexture()
     }
 
-    fun colorfulToGray(texture: Int) {
-        if (!OpenCLJNI.findOpenCL) return
-        nColorfulToGray(texture)
+    fun colorfulToGray(width: Int, height: Int, input: Int, output: Int): Boolean {
+        if (!OpenCLJNI.findOpenCL) return false
+        return nColorfulToGray(width, height, input, output)
     }
 
     private external fun nCreateTexture(): Int
 
-    private external fun nColorfulToGray(texture: Int)
+    private external fun nColorfulToGray(width: Int, height: Int, input: Int, output: Int): Boolean
 
 }
