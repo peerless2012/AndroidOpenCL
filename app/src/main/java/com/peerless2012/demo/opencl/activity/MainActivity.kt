@@ -6,7 +6,7 @@ import android.view.Menu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import com.peerless2012.demo.opencl.R
-import com.peerless2012.demo.opencl.render.TextureRender
+import com.peerless2012.demo.opencl.render.GLInCLOutRender
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,7 +21,7 @@ class MainActivity : AppCompatActivity() {
 
         val glSurfaceView = findViewById<GLSurfaceView>(R.id.main_surface_view)
         glSurfaceView.setEGLContextClientVersion(2)
-        glSurfaceView.setRenderer(TextureRender(applicationContext))
+        glSurfaceView.setRenderer(GLInCLOutRender(applicationContext))
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

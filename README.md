@@ -21,3 +21,4 @@ OpenCL for Android.
 * [clCreateFromGLTexture](https://man.opencl.org/clCreateFromGLTexture.html)
 * [OpenCL Programming Guide for Mac](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/OpenCL_MacProgGuide/shareGroups/shareGroups.html)
 * [OpenCL 使用OpenGL纹理数据](https://deepinout.com/opencl/opencl-interoperates-with-opengl/opencl-clcreatefromgltexture.html)
+* [OpenCL优化：内存性能优化](https://zhuanlan.zhihu.com/p/396912769)

@@ -5,7 +5,6 @@
  * @Version V1.0
  * @Description 
  */
-
 #include "OpenCL4J.h"
 #include "CL/cl_gl.h"
 #include "CL/cl_egl.h"
@@ -20,6 +19,151 @@
 #include "EGL/eglext.h"
 #include "string"
 #define printf ALOGV
+
+struct CLEnvironment {
+
+    bool ready = false;
+
+    cl_context clContext = nullptr;
+
+    cl_command_queue clCommandQueue = nullptr;
+
+    cl_program clProgram = nullptr;
+
+    cl_kernel clKernel = nullptr;
+
+    CLEnvironment(const char** source, const char* name) {
+        ALOGI("CLEnvironment ctor");
+        char* value;
+        size_t valueSize;
+        cl_uint platformCount;
+        cl_platform_id* platforms;
+        cl_platform_id platformId = nullptr;
+        cl_uint deviceCount;
+        cl_device_id* devices;
+        cl_device_id deviceId = nullptr;
+        clGetPlatformIDs(0, nullptr, &platformCount);
+        platforms = (cl_platform_id*)malloc(sizeof(cl_platform_id)* platformCount);
+        clGetPlatformIDs(platformCount, platforms, NULL);
+        for (cl_uint i = 0; i < platformCount; i++) {
+                    printf("%d. OpenCL Platform [%d]:\n", i + 1, i + 1);
+            clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, 0, NULL, &valueSize);
+            value = (char*)malloc(valueSize);
+            clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, valueSize, value, NULL);
+                    printf("   CL_PLATFORM_NAME: %s\n", value);
+            free(value);
+
+            clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 0, NULL, &deviceCount);
+                    printf("   Total Device Count: %d\n", deviceCount);
+
+            // get all GPU devices
+            clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &deviceCount);
+            devices = (cl_device_id*)malloc(sizeof(cl_device_id)* deviceCount);
+            clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, deviceCount, devices, NULL);
+
+            // for each device print critical attributes
+            for (cl_uint j = 0; j < deviceCount; j++) {
+                // print device entexsion
+                clGetDeviceInfo(devices[j], CL_DEVICE_EXTENSIONS, 0, NULL, &valueSize);
+                value = (char*)malloc(valueSize);
+                clGetDeviceInfo(devices[j], CL_DEVICE_EXTENSIONS, valueSize, value, NULL);
+                        printf("    CL_DEVICE_EXTENSIONS: %s\n", value);
+                if (strpbrk(value, "cl_khr_gl_sharing") != nullptr
+                    && strpbrk(value, "cl_khr_egl_event") != nullptr) {
+                    platformId = platforms[i];
+                    deviceId = devices[j];
+                    break;
+                }
+                free(value);
+            }
+
+        }
+        if (deviceId == nullptr) {
+            return;
+        }
+
+        EGLContext eglContext = eglGetCurrentContext();
+        EGLDisplay eglDisplay = eglGetCurrentDisplay();
+        cl_context_properties props[] = {CL_GL_CONTEXT_KHR,(cl_context_properties) eglContext,
+                                         CL_EGL_DISPLAY_KHR,(cl_context_properties) eglDisplay,
+                                         CL_CONTEXT_PLATFORM,(cl_context_properties) platformId,
+                                         CL_NONE};
+        // https://man.opencl.org/clCreateContext.html
+        int error_code;
+        clContext = clCreateContext(props
+                , 1
+                , &deviceId
+                , nullptr
+                , nullptr
+                , &error_code);
+        if (!clContext) {
+            ALOGE("Create cl_context error: %d", error_code);
+            return;
+        }
+
+        clCommandQueue = clCreateCommandQueue(clContext
+                , deviceId
+                , CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE
+                , &error_code);
+        if (!clCommandQueue) {
+            ALOGE("Create cl_command_queue error: %d", error_code);
+            return;
+        }
+
+        clProgram = clCreateProgramWithSource(clContext
+                , 1
+                , source
+                , nullptr
+                , &error_code);
+        if (!clProgram) {
+            ALOGE("Create cl_program error: %d", error_code);
+            return;
+        }
+        cl_program_info clBuildProgramResult = clBuildProgram(clProgram, 0, NULL, NULL, NULL, NULL);
+        if (clBuildProgramResult != CL_SUCCESS) {
+            clGetProgramBuildInfo(clProgram
+                    , deviceId
+                    , CL_PROGRAM_BUILD_LOG
+                    , 0
+                    , nullptr
+                    , &valueSize);
+            value = (char*) malloc(valueSize);
+            clGetProgramBuildInfo(clProgram
+                    , deviceId
+                    , CL_PROGRAM_BUILD_LOG
+                    , valueSize
+                    , value
+                    , nullptr);
+            ALOGI("Build cl_program info: %s", value);
+            free(value);
+            return;
+        }
+
+        clKernel = clCreateKernel(clProgram, name, &error_code);
+        if (!clKernel) {
+            ALOGE("Create cl_kernel error: %d", error_code);
+            return;
+        }
+
+        ready = true;
+    }
+
+    ~CLEnvironment() {
+        ALOGI("CLEnvironment ~ctor");
+        if (clProgram != nullptr) {
+            clReleaseProgram(clProgram);
+        }
+        if (clCommandQueue != nullptr) {
+            clReleaseCommandQueue(clCommandQueue);
+        }
+        if (clKernel != nullptr) {
+            clReleaseKernel(clKernel);
+        }
+        if (clContext != nullptr) {
+            clReleaseContext(clContext);
+        }
+    }
+};
 
 static const char * source =
          "__kernel void rgba_to_gray(__read_only image2d_t input, __write_only image2d_t output)\n"
@@ -354,159 +498,196 @@ Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nCreateTexture(JNIEnv *env, jobje
  */
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nColorfulToGray(JNIEnv *env, jobject thiz, jint width, jint height, jint inTex, jint outTex) {
-    char* value;
-    size_t valueSize;
-    cl_uint platformCount;
-    cl_platform_id* platforms;
-    cl_platform_id platformId = nullptr;
-    cl_uint deviceCount;
-    cl_device_id* devices;
-    cl_device_id deviceId = nullptr;
-
-    clGetPlatformIDs(0, NULL, &platformCount);
-    platforms = (cl_platform_id*)malloc(sizeof(cl_platform_id)* platformCount);
-    clGetPlatformIDs(platformCount, platforms, NULL);
-    for (cl_uint i = 0; i < platformCount; i++) {
-        printf("%d. OpenCL Platform [%d]:\n", i + 1, i + 1);
-        clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, 0, NULL, &valueSize);
-        value = (char*)malloc(valueSize);
-        clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, valueSize, value, NULL);
-                printf("   CL_PLATFORM_NAME: %s\n", value);
-        free(value);
-
-        clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_ALL, 0, NULL, &deviceCount);
-                printf("   Total Device Count: %d\n", deviceCount);
-
-        // get all GPU devices
-        clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &deviceCount);
-        devices = (cl_device_id*)malloc(sizeof(cl_device_id)* deviceCount);
-        clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, deviceCount, devices, NULL);
-
-        // for each device print critical attributes
-        for (cl_uint j = 0; j < deviceCount; j++) {
-            // print device entexsion
-            clGetDeviceInfo(devices[j], CL_DEVICE_EXTENSIONS, 0, NULL, &valueSize);
-            value = (char*)malloc(valueSize);
-            clGetDeviceInfo(devices[j], CL_DEVICE_EXTENSIONS, valueSize, value, NULL);
-                    printf("    CL_DEVICE_EXTENSIONS: %s\n", value);
-            if (strpbrk(value, "cl_khr_gl_sharing") != nullptr
-                && strpbrk(value, "cl_khr_egl_event") != nullptr) {
-                platformId = platforms[i];
-                deviceId = devices[j];
-                break;
-            }
-            free(value);
-        }
-        if (deviceId == nullptr) {
-            return false;
-        }
-
+Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nColorfulToGrayGLInGLOut(JNIEnv *env, jobject thiz,
+                                                                        jint width, jint height,
+                                                                        jint input, jint output) {
+    CLEnvironment clEnvironment(&source, "rgba_to_gray");
+    if (!clEnvironment.ready) {
+        return false;
     }
-    EGLContext eglContext = eglGetCurrentContext();
-    EGLDisplay eglDisplay = eglGetCurrentDisplay();
-    cl_context_properties props[] = {CL_GL_CONTEXT_KHR,(cl_context_properties) eglContext,
-                                     CL_EGL_DISPLAY_KHR,(cl_context_properties) eglDisplay,
-                                     CL_CONTEXT_PLATFORM,(cl_context_properties) platformId,
-                                     CL_NONE};
-    // https://man.opencl.org/clCreateContext.html
     int error_code;
-    cl_context clContext = clCreateContext(props
-            , 1
-            , &deviceId
-            , nullptr
-            , nullptr
-            , &error_code);
-    if (!clContext) {
-        ALOGE("Create cl_context error: %d", error_code);
-        return false;
-    }
-
-    cl_command_queue commandQueue = clCreateCommandQueue(clContext
-            , deviceId
-            , CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE
-            , &error_code);
-    if (!commandQueue) {
-        ALOGE("Create cl_command_queue error: %d", error_code);
-        return false;
-    }
-
-    cl_program clProgram = clCreateProgramWithSource(clContext
-                              , 1
-                              , &source
-                              , nullptr
-                              , &error_code);
-    if (!clProgram) {
-        ALOGE("Create cl_program error: %d", error_code);
-        return false;
-    }
-    cl_program_info clBuildProgramResult = clBuildProgram(clProgram, 0, NULL, NULL, NULL, NULL);
-    if (clBuildProgramResult != CL_SUCCESS) {
-        clGetProgramBuildInfo(clProgram
-                              , deviceId
-                              , CL_PROGRAM_BUILD_LOG
-                              , 0
-                              , nullptr
-                              , &valueSize);
-        value = (char*) malloc(valueSize);
-        clGetProgramBuildInfo(clProgram
-                              , deviceId
-                              , CL_PROGRAM_BUILD_LOG
-                              , valueSize
-                              , value
-                              , nullptr);
-        ALOGI("Build cl_program info: %s", value);
-        free(value);
-        return false;
-    }
-
-    cl_kernel kernel = clCreateKernel(clProgram, "rgba_to_gray", &error_code);
-    if (!kernel) {
-        ALOGE("Create cl_kernel error: %d", error_code);
-        return false;
-    }
-
     // https://man.opencl.org/clCreateFromGLTexture.html
-    cl_mem inputMem = clCreateFromGLTexture(clContext
+    cl_mem inputMem = clCreateFromGLTexture(clEnvironment.clContext
             , CL_MEM_READ_ONLY
             , GL_TEXTURE_2D
             , 0
-            , inTex
+            , input
             , &error_code);
     if (!inputMem) {
         ALOGE("Create cl_mem input error: %d", error_code);
         clReleaseMemObject(inputMem);
         return false;
     }
-    cl_mem outputMem = clCreateFromGLTexture(clContext
+    cl_mem outputMem = clCreateFromGLTexture(clEnvironment.clContext
             , CL_MEM_WRITE_ONLY
             , GL_TEXTURE_2D
             , 0
-            , outTex
+            , output
             , &error_code);
     if (!outputMem) {
         ALOGE("Create cl_mem output error: %d", error_code);
         return false;
     }
 
-    clSetKernelArg(kernel, 0, sizeof(cl_mem), &inputMem);
-    clSetKernelArg(kernel, 1, sizeof(cl_mem), &outputMem);
+    clSetKernelArg(clEnvironment.clKernel, 0, sizeof(cl_mem), &inputMem);
+    clSetKernelArg(clEnvironment.clKernel, 1, sizeof(cl_mem), &outputMem);
 
     size_t global_size[2] = {(size_t) width, (size_t) height};
-    clEnqueueNDRangeKernel(commandQueue
-                           , kernel
-                           , 2
-                           , NULL
-                           , global_size
-                           , NULL
-                           , 0
-                           , NULL
-                           , NULL);
+    clEnqueueNDRangeKernel(clEnvironment.clCommandQueue
+            , clEnvironment.clKernel
+            , 2
+            , NULL
+            , global_size
+            , NULL
+            , 0
+            , NULL
+            , NULL);
 
     // Make sure the command is finish.
-    clFinish(commandQueue);
-
-    clReleaseContext(clContext);
+    clFinish(clEnvironment.clCommandQueue);
     return true;
 }
 
+extern "C"
+JNIEXPORT jint JNICALL
+        Java_com_peerless2012_demo_opencl_jni_OpenCL4J_nColorfulToGrayGLInCLOut(JNIEnv * env,
+                                                                                jobject thiz,
+                                                                                jint width,
+                                                                                jint height,
+                                                                                jint inTex
+) {
+    CLEnvironment clEnvironment(&source, "rgba_to_gray");
+    if (!clEnvironment.ready) {
+        return false;
+    }
+    int error_code;
+    // https://man.opencl.org/clCreateFromGLTexture.html
+    cl_mem inputMem = clCreateFromGLTexture(clEnvironment.clContext
+            , CL_MEM_READ_ONLY
+            , GL_TEXTURE_2D
+            , 0
+            , inTex
+            , &error_code);
+    if (inputMem == nullptr) {
+        ALOGE("Create cl_mem input error: %d", error_code);
+        return inTex;
+    }
+
+    // https://registry.khronos.org/OpenCL/specs/3.0-unified/html/OpenCL_API.html#image-format-descriptor
+    cl_image_format clImageFormat = {CL_RGBA
+                                     , CL_UNORM_INT8};
+    // https://registry.khronos.org/OpenCL/specs/3.0-unified/html/OpenCL_API.html#image-descriptor
+    cl_image_desc clImageDesc = {CL_MEM_OBJECT_IMAGE2D
+                                 , (size_t) width
+                                 , (size_t) height
+                                 , 0
+                                 , 1
+                                 , 0
+                                 , 0
+                                 , 0
+                                 , 0};
+    // https://registry.khronos.org/OpenCL/sdk/3.0/docs/man/html/clCreateImage.html
+    cl_mem outputMem = clCreateImage(clEnvironment.clContext
+                  , CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR
+                  , &clImageFormat
+                  , &clImageDesc
+                  , nullptr
+                  , &error_code);
+    if (outputMem == nullptr) {
+        ALOGE("Create cl_mem out error: %d", error_code);
+        return inTex;
+    }
+
+    clSetKernelArg(clEnvironment.clKernel, 0, sizeof(cl_mem), &inputMem);
+    clSetKernelArg(clEnvironment.clKernel, 1, sizeof(cl_mem), &outputMem);
+
+    size_t global_size[2] = {(size_t) width, (size_t) height};
+    clEnqueueNDRangeKernel(clEnvironment.clCommandQueue
+            , clEnvironment.clKernel
+            , 2
+            , NULL
+            , global_size
+            , NULL
+            , 0
+            , NULL
+            , NULL);
+
+
+    clFinish(clEnvironment.clCommandQueue);
+
+    size_t region[] = {0,0, 0};
+    size_t dimen[] = {(size_t)width, (size_t)height, 1};
+    size_t image_row_pitch = width;
+    size_t image_slice_pitch = width * height;
+
+    // https://deepinout.com/opencl/opencl-memory-object/opencl-image-object-mapping.html
+    void *outBuffer = nullptr;
+    void *mapBuffer = clEnqueueMapImage(clEnvironment.clCommandQueue
+                      , outputMem
+                      , CL_TRUE
+                      , CL_MAP_READ
+                      , region
+                      , dimen
+                      , &image_row_pitch
+                      , &image_slice_pitch
+                      , 0
+                      , nullptr
+                      , nullptr
+                      , &error_code);
+
+    if (mapBuffer == nullptr) {
+        ALOGW("Map cl_mem error: %d", error_code);
+        // 为pDeviceBuffer申请空间
+        outBuffer = malloc(width * height * 4);
+        int ret = clEnqueueReadImage(clEnvironment.clCommandQueue
+                           , outputMem
+                           , CL_TRUE
+                           , region
+                           , dimen
+                           , 0
+                           , 0
+                           , outBuffer
+                           , 0
+                           , nullptr
+                           , nullptr);
+        if(ret != CL_SUCCESS) {
+            ALOGE("cl_read out error: %d", ret);
+            free(outBuffer);
+            return inTex;
+        }
+    } else {
+        ALOGI("Map cl_mem success");
+    }
+
+    // Make sure the command is finish.
+    clFinish(clEnvironment.clCommandQueue);
+
+    GLuint outTex = 0;
+    glGenTextures(1, &outTex);
+    glBindTexture(GL_TEXTURE_2D, outTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D
+                 , 0
+                 , GL_RGBA
+                 , (GLsizei) width
+                 , (GLsizei) height
+                 , 0
+                 , GL_RGBA
+                 , GL_UNSIGNED_BYTE
+                 , mapBuffer != nullptr ? mapBuffer : outBuffer);
+    glFinish();
+
+    GLenum error = glGetError();
+    if (error != 0) {
+        ALOGE("glTexImage2D error: %d", error);
+    }
+
+    if (outBuffer != nullptr) {
+        free(outBuffer);
+    }
+
+    return outTex;
+}

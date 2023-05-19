@@ -24,11 +24,11 @@ import javax.microedition.khronos.opengles.GL10
  * @Version V1.0
  * @Description
  */
-class TextureRender(private val context: Context): GLSurfaceView.Renderer {
+abstract class TextureRender(private val context: Context): GLSurfaceView.Renderer {
 
     companion object {
 
-        private const val TAG = "TextureRender"
+        const val TAG = "TextureRender"
 
         val MVP_MATRIX = FloatArray(16).also {
             Matrix.setIdentityM(it, 0)
@@ -215,36 +215,13 @@ class TextureRender(private val context: Context): GLSurfaceView.Renderer {
             Log.w(TAG, "Load bitmap fail.")
             return
         }
-
-        // texture
-        val txtArr = IntArray(2)
-        GLES20.glGenTextures(txtArr.size, txtArr, 0)
-        if (txtArr[0] <= 0 || txtArr[1] <= 0) {
-            Log.w(TAG, "Generate texture fail.")
-            return
-        }
-        txtArr.forEachIndexed { index, value ->
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, value)
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
-            if (index == 0) {
-                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
-            } else {
-                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, bitmap.width, bitmap.height, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
-            }
-        }
-
         val start = System.currentTimeMillis()
-        texture = if (OpenCL4J.colorfulToGray(bitmap.width, bitmap.height, txtArr[0], txtArr[1])) {
-            txtArr[1]
-        } else {
-            txtArr[0]
-        }
+        texture = onCreateTexture(bitmap)
         val end = System.currentTimeMillis()
         Log.i(TAG, "Colorful ${bitmap.width} x ${bitmap.height} to gray cost ${end - start}ms")
     }
+
+    abstract fun onCreateTexture(bitmap: Bitmap): Int
 
     override fun onSurfaceChanged(gl: GL10, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
